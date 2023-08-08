@@ -207,20 +207,23 @@ class DropboxRequest:
         # Record the start time
         start_time = time.time()
 
-        # Fetch group IDs asynchronously
+        # Fetch existing group IDs, create new groups, and new folders
         ids = await self._init_project_async(pm_name, field_name)
 
-        # Unpack the group_ids list
+        #new varible names for the group/folders ids
         executive_id, purchasing_id, accounting_id, vdc_id, contracts_id, safety_id, pm_group_id, field_group_id, pm_folder_id, field_folder_id = ids
+        
+        #admin must be in the PM folder to create/edit the subfolders
         await self._add_member_to_group(self.admin_email, pm_group_id)
 
+        # This sharing must be completed before other tasks
         pre_share_tasks = [
             self._share_folder_with_group(pm_folder_id, pm_group_id, True),
             self._share_folder_with_group(field_folder_id, pm_group_id, True)
         ]
 
         await asyncio.gather(*pre_share_tasks)
-        # share folders async
+        # share and create folders, add group members asynchronously
         share_tasks = [
             self._share_folder_with_group(pm_folder_id, contracts_id, False),
             self._share_folder_with_group(pm_folder_id, executive_id, True),
@@ -243,6 +246,7 @@ class DropboxRequest:
         ]
         await asyncio.gather(*share_tasks)
 
+        #These 2 folders have specific access requirements
         subfolder_tasks = [
             self._share_folder(f"/{field_name}/Safety"),
             self._share_folder(f"/{pm_name}/Contracts and Change Orders – FINAL")
@@ -259,7 +263,7 @@ class DropboxRequest:
 
         await asyncio.gather(*reshare_tasks)
 
-        # remove add "user" to PM group
+        # remove admin from PM group
         self.user.sharing_relinquish_folder_membership(ccof_folder_id)
         self._remove_member_from_group(self.admin_email, pm_group_id)
         
